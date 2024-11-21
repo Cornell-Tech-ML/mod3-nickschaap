@@ -1,9 +1,11 @@
+"""Minitorch library"""
+
 from .testing import MathTest, MathTestVariable  # type: ignore # noqa: F401,F403
 from .fast_ops import *  # noqa: F401,F403
 from .cuda_ops import *  # noqa: F401,F403
 from .tensor_data import *  # noqa: F401,F403
 from .tensor_functions import *  # noqa: F401,F403
-from .tensor_functions import tensor
+from .tensor_functions import tensor  # noqa: F401
 from .tensor_ops import *  # noqa: F401,F403
 from .scalar import *  # noqa: F401,F403
 from .scalar_functions import *  # noqa: F401,F403
