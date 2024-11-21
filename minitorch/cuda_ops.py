@@ -261,28 +261,10 @@ def _sum_practice(out: Storage, a: Storage, size: int) -> None:
 
     cuda.syncthreads()
 
-    if pos % 2 == 0 and i + 1 < size:
-        cache[pos] += cache[pos + 1]
-
-    cuda.syncthreads()
-
-    if pos % 4 == 0 and i + 2 < size:
-        cache[pos] += cache[pos + 2]
-
-    cuda.syncthreads()
-
-    if pos % 8 == 0 and i + 4 < size:
-        cache[pos] += cache[pos + 4]
-
-    cuda.syncthreads()
-
-    if pos % 16 == 0 and i + 8 < size:
-        cache[pos] += cache[pos + 8]
-
-    cuda.syncthreads()
-
-    if pos % 32 == 0 and i + 16 < size:
-        cache[pos] += cache[pos + 16]
+    for k in [2, 4, 8, 16, 32]:
+        if pos % k == 0 and i + (k // 2) < size:
+            cache[pos] += cache[pos + (k // 2)]
+        cuda.syncthreads()
 
     if pos == 0:
         out[cuda.blockIdx.x] = cache[0]
