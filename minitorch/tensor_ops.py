@@ -17,6 +17,8 @@ if TYPE_CHECKING:
     from .tensor import Tensor
     from .tensor_data import Shape, Storage, Strides
 
+MAX_DIMS = 32
+
 
 class MapProto(Protocol):
     def __call__(self, x: Tensor, out: Optional[Tensor] = ..., /) -> Tensor:
@@ -271,38 +273,16 @@ def tensor_map(
         in_shape: Shape,
         in_strides: Strides,
     ) -> None:
-        # Compute the broadcasted shape
-        try:
-            broadcasted_shape = shape_broadcast(tuple(out_shape), tuple(in_shape))
-        except ValueError as e:
-            raise ValueError(
-                f"Cannot broadcast shapes {out_shape} and {in_shape}"
-            ) from e
-
-        # Total number of elements in the broadcasted tensor
-        total_elements = int(operators.prod(broadcasted_shape))
-
-        # Precompute the dimension difference for broadcasting
-        out_dim_diff = len(broadcasted_shape) - len(out_shape)
-        in_dim_diff = len(broadcasted_shape) - len(in_shape)
+        out_index = np.zeros(MAX_DIMS, np.int16)
+        in_index = np.zeros(MAX_DIMS, np.int16)
 
         # Iterate over each element in the broadcasted tensor
-        for idx in range(total_elements):
-            # Compute the multi-dimensional index for the broadcasted tensor
-            multi_index = np.array([0] * len(broadcasted_shape))
-            to_index(idx, np.array(broadcasted_shape), multi_index)
-
-            # Map to output tensor index
-            out_index = multi_index[out_dim_diff:]
-            out_flat_index = index_to_position(out_index, out_strides)
-
-            # Map to input tensor index using broadcasting
-            in_index = multi_index[in_dim_diff:]
-            broadcast_index(in_index, np.array(broadcasted_shape), in_shape, in_index)
-            in_flat_index = index_to_position(in_index, in_strides)
-
-            # Apply the function and store the result
-            out[out_flat_index] = fn(in_storage[in_flat_index])
+        for i in range(len(out)):
+            to_index(i, out_shape, out_index)
+            broadcast_index(out_index, out_shape, in_shape, in_index)
+            o = index_to_position(out_index, out_strides)
+            j = index_to_position(in_index, in_strides)
+            out[o] = fn(in_storage[j])
 
     return _map
 
@@ -348,49 +328,18 @@ def tensor_zip(
         b_shape: Shape,
         b_strides: Strides,
     ) -> None:
-        # Compute the total number of elements in the output tensor.
-        out_size = 1
-        for s in out_shape:
-            out_size *= s
+        out_index = np.zeros(MAX_DIMS, np.int16)
+        a_index = np.zeros(MAX_DIMS, np.int16)
+        b_index = np.zeros(MAX_DIMS, np.int16)
 
-        max_dims = len(out_shape)
-
-        # Function to pad shapes and strides to the maximum dimensions.
-        def pad_list(lst: np.ndarray, max_dims: int, pad_value: int) -> np.ndarray:
-            return np.array([pad_value] * (max_dims - len(lst)) + list(lst))
-
-        # Pad shapes and strides for broadcasting.
-        a_shape_padded = pad_list(a_shape, max_dims, 1)
-        a_strides_padded = pad_list(a_strides, max_dims, 0)
-        b_shape_padded = pad_list(b_shape, max_dims, 1)
-        b_strides_padded = pad_list(b_strides, max_dims, 0)
-
-        for i in range(out_size):
-            # Convert the flat index to a multidimensional index for the output tensor.
-            out_index = np.array([0] * max_dims)
+        for i in range(len(out)):
             to_index(i, out_shape, out_index)
-
-            # Adjust indices for tensors a and b based on broadcasting rules.
-            a_index = np.array(
-                [
-                    0 if a_shape_padded[dim] == 1 else out_index[dim]
-                    for dim in range(max_dims)
-                ]
-            )
-            b_index = np.array(
-                [
-                    0 if b_shape_padded[dim] == 1 else out_index[dim]
-                    for dim in range(max_dims)
-                ]
-            )
-
-            # Calculate flat positions using strides.
-            out_pos = index_to_position(out_index, out_strides)
-            a_pos = index_to_position(a_index, a_strides_padded)
-            b_pos = index_to_position(b_index, b_strides_padded)
-
-            # Apply the function and store the result.
-            out[out_pos] = fn(a_storage[a_pos], b_storage[b_pos])
+            o = index_to_position(out_index, out_strides)
+            broadcast_index(out_index, out_shape, a_shape, a_index)
+            j = index_to_position(a_index, a_strides)
+            broadcast_index(out_index, out_shape, b_shape, b_index)
+            k = index_to_position(b_index, b_strides)
+            out[o] = fn(a_storage[j], b_storage[k])
 
     return _zip
 
@@ -422,34 +371,17 @@ def tensor_reduce(
         a_strides: Strides,
         reduce_dim: int,
     ) -> None:
-        # Compute the total number of elements in the output tensor.
-        out_size = 1
-        for s in out_shape:
-            out_size *= s
+        out_index = np.zeros(MAX_DIMS, np.int16)
+        reduce_size = a_shape[reduce_dim]
 
         # Iterate over each element in the output tensor.
-        for i in range(out_size):
-            # Convert the flat index to a multidimensional index for the output tensor.
-            out_index = np.array([0] * len(out_shape))
+        for i in range(len(out)):
             to_index(i, out_shape, out_index)
-
-            # Prepare an index for the input tensor 'a'.
-            a_index = out_index.copy()
-
-            # Initialize the reduction result with the first element along the reduction dimension.
-            a_index[reduce_dim] = 0
-            a_pos = index_to_position(a_index, a_strides)
-            result = a_storage[a_pos]
-
-            # Iterate over the reduction dimension.
-            for rd in range(1, a_shape[reduce_dim]):
-                a_index[reduce_dim] = rd
-                a_pos = index_to_position(a_index, a_strides)
-                result = fn(result, a_storage[a_pos])
-
-            # Store the result in the output storage.
-            out_pos = index_to_position(out_index, out_strides)
-            out[out_pos] = result
+            o = index_to_position(out_index, out_strides)
+            for s in range(reduce_size):
+                out_index[reduce_dim] = s
+                j = index_to_position(out_index, a_strides)
+                out[o] = fn(out[o], a_storage[j])
 
     return _reduce
 

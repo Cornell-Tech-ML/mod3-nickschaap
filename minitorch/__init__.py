@@ -3,6 +3,7 @@ from .fast_ops import *  # noqa: F401,F403
 from .cuda_ops import *  # noqa: F401,F403
 from .tensor_data import *  # noqa: F401,F403
 from .tensor_functions import *  # noqa: F401,F403
+from .tensor_functions import tensor
 from .tensor_ops import *  # noqa: F401,F403
 from .scalar import *  # noqa: F401,F403
 from .scalar_functions import *  # noqa: F401,F403

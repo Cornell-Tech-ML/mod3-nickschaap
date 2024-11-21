@@ -22,8 +22,8 @@ class IndexingError(RuntimeError):
 
 
 Storage: TypeAlias = npt.NDArray[np.float64]
-OutIndex: TypeAlias = npt.NDArray[np.int32]
-Index: TypeAlias = npt.NDArray[np.int32]
+OutIndex: TypeAlias = npt.NDArray[np.int16]
+Index: TypeAlias = npt.NDArray[np.int16]
 Shape: TypeAlias = npt.NDArray[np.int32]
 Strides: TypeAlias = npt.NDArray[np.int32]
 
@@ -46,7 +46,10 @@ def index_to_position(index: Index, strides: Strides) -> int:
         Position in storage
 
     """
-    return int(sum(zipWith(index, strides, lambda x, y: x * y)))
+    position = 0
+    for ind, stride in zip(index, strides):
+        position += ind * stride
+    return position
 
 
 def to_index(ordinal: int, shape: Shape, out_index: OutIndex) -> None:
@@ -62,11 +65,11 @@ def to_index(ordinal: int, shape: Shape, out_index: OutIndex) -> None:
         out_index : return index corresponding to position.
 
     """
-    if len(shape) != len(out_index):
-        raise IndexingError("Shape and out_index must have same length.")
-    for i in range(len(shape)):
-        out_index[i] = ordinal % shape[i]
-        ordinal = ordinal // shape[i]
+    curr_ord = ordinal + 0
+    for i in range(len(shape) - 1, -1, -1):
+        sh = shape[i]
+        out_index[i] = int(curr_ord % sh)
+        curr_ord = curr_ord // sh
 
 
 def broadcast_index(
@@ -90,13 +93,11 @@ def broadcast_index(
         None
 
     """
-    pad_len = len(big_shape) - len(shape)
-    for i in range(len(shape)):
-        big_i = pad_len + i
-        if shape[i] == 1:
-            out_index[i] = 0
+    for i, s in enumerate(shape):
+        if s > 1:
+            out_index[i] = big_index[i + (len(big_shape) - len(shape))]
         else:
-            out_index[i] = big_index[big_i]
+            out_index[i] = 0
 
 
 def shape_broadcast(shape1: UserShape, shape2: UserShape) -> UserShape:
@@ -116,23 +117,23 @@ def shape_broadcast(shape1: UserShape, shape2: UserShape) -> UserShape:
         IndexingError : if cannot broadcast
 
     """
-    out_dims = max(len(shape1), len(shape2))
-
-    def padded_shape(shape: UserShape) -> UserShape:
-        return tuple([1] * (out_dims - len(shape)) + list(shape))
-
-    def max_broadcast(x: int, y: int) -> int:
-        if x == 1:
-            return y
-        if y == 1:
-            return x
-        if x == y:
-            return x
-        raise IndexingError(f"Shapes {shape1} and {shape2} are not broadcastable.")
-
-    return tuple(
-        zipWith(list(padded_shape(shape1)), list(padded_shape(shape2)), max_broadcast)
-    )
+    a, b = shape1, shape2
+    m = max(len(a), len(b))
+    c_rev = [0] * m
+    a_rev = list(reversed(a))
+    b_rev = list(reversed(b))
+    for i in range(m):
+        if i >= len(a):
+            c_rev[i] = b_rev[i]
+        elif i >= len(b):
+            c_rev[i] = a_rev[i]
+        else:
+            c_rev[i] = max(a_rev[i], b_rev[i])
+            if a_rev[i] != c_rev[i] and a_rev[i] != 1:
+                raise IndexingError(f"Broadcast failure {a} {b}")
+            if b_rev[i] != c_rev[i] and b_rev[i] != 1:
+                raise IndexingError(f"Broadcast failure {a} {b}")
+    return tuple(reversed(c_rev))
 
 
 def strides_from_shape(shape: UserShape) -> UserStrides:
