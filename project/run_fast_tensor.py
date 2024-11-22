@@ -108,7 +108,7 @@ class FastTrain:
                 log_fn(epoch, total_loss, correct, losses)
                 print(f"Epoch {epoch} took {end_time - start_time} seconds")
                 print(f"Average time per epoch: {sum(times) / len(times)}")
-            
+
 
         print(f"Average time per epoch: {sum(times) / len(times)}")
 
