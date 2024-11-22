@@ -18,7 +18,7 @@ from .tensor_ops import MapProto, TensorOps
 if TYPE_CHECKING:
     from typing import Callable, Optional
 
-    from .tensor import Tensor
+    from .tensors import Tensor
     from .tensor_data import Shape, Storage, Strides
 
 # TIP: Use `NUMBA_DISABLE_JIT=1 pytest tests/ -m task3_1` to run these tests without JIT.

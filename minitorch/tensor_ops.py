@@ -14,7 +14,7 @@ from .tensor_data import (
 )
 
 if TYPE_CHECKING:
-    from .tensor import Tensor
+    from .tensors import Tensor
     from .tensor_data import Shape, Storage, Strides
 
 MAX_DIMS = 32
@@ -93,9 +93,6 @@ class TensorBackend:
         self.mul_reduce = ops.reduce(operators.mul, 1.0)
         self.matrix_multiply = ops.matrix_multiply
         self.cuda = ops.cuda
-
-    def __repr__(self):
-        return f"TensorBackend(ops={self.ops})"
 
 
 class SimpleOps(TensorOps):
