@@ -4,6 +4,9 @@ import numba
 
 import minitorch
 import time
+import warnings
+
+warnings.filterwarnings("ignore")
 
 datasets = minitorch.datasets
 FastTensorBackend = minitorch.TensorBackend(minitorch.FastOps)
@@ -94,6 +97,7 @@ class FastTrain:
 
             losses.append(total_loss)
             end_time = time.time()
+            times.append(end_time - start_time)
             # Logging
             if epoch % 10 == 0 or epoch == max_epochs:
                 X = minitorch.tensor(data.X, backend=self.backend)
@@ -104,7 +108,7 @@ class FastTrain:
                 log_fn(epoch, total_loss, correct, losses)
                 print(f"Epoch {epoch} took {end_time - start_time} seconds")
                 print(f"Average time per epoch: {sum(times) / len(times)}")
-            times.append(end_time - start_time)
+            
 
         print(f"Average time per epoch: {sum(times) / len(times)}")
 
