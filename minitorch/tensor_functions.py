@@ -180,19 +180,22 @@ class Mul(Function):
 
 class Permute(Function):
     @staticmethod
-    def forward(ctx: Context, t1: Tensor, axes: Tensor) -> Tensor:
+    def forward(ctx: Context, a: Tensor, order: Tensor) -> Tensor:
         """Permute forward"""
-        ctx.save_for_backward(t1, axes)
-        tensor_data = t1._tensor.permute(*axes.to_numpy().astype(int))
-        return t1._new(tensor_data)
+        ctx.save_for_backward(order)
+        return a._new(a._tensor.permute(*[int(order[i]) for i in range(order.size)]))
 
     @staticmethod
     def backward(ctx: Context, grad_output: Tensor) -> tuple[Tensor, ...]:
         """Permute backward"""
-        (t1, axes) = ctx.saved_values
-        return minitorch.Tensor.make(
-            grad_output._tensor._storage, t1.shape, backend=grad_output.backend
-        ), zeros(axes.shape)
+        order: Tensor = ctx.saved_values[0]
+        order2 = [
+            a[0]
+            for a in sorted(
+                enumerate([order[i] for i in range(order.size)]), key=lambda x: x[1]
+            )
+        ]
+        return grad_output._new(grad_output._tensor.permute(*order2)), 0.0
 
 
 class ReLU(Function):
