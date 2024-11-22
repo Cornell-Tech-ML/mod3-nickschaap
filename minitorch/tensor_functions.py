@@ -186,7 +186,7 @@ class Permute(Function):
         return a._new(a._tensor.permute(*[int(order[i]) for i in range(order.size)]))
 
     @staticmethod
-    def backward(ctx: Context, grad_output: Tensor) -> tuple[Tensor, ...]:
+    def backward(ctx: Context, grad_output: Tensor) -> tuple[Tensor, float]:
         """Permute backward"""
         order: Tensor = ctx.saved_values[0]
         order2 = [

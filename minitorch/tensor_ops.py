@@ -94,6 +94,9 @@ class TensorBackend:
         self.matrix_multiply = ops.matrix_multiply
         self.cuda = ops.cuda
 
+    def __repr__(self):
+        return f"TensorBackend(ops={self.ops})"
+
 
 class SimpleOps(TensorOps):
     @staticmethod
